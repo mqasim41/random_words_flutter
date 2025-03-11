@@ -43,13 +43,13 @@ class MyAppState extends ChangeNotifier {
     notifyListeners();
   }
   
-  // Add a method to remove a specific favorite item
+
   void removeFavorite(WordPair pair) {
     favorites.remove(pair);
     notifyListeners();
   }
   
-  // Add a method to remove multiple favorites at once
+
   void removeMultipleFavorites(List<WordPair> pairs) {
     favorites.removeWhere((pair) => pairs.contains(pair));
     notifyListeners();
@@ -74,7 +74,7 @@ class _MyHomePageState extends State<MyHomePage> {
       case 1:
         page = FavoritesPage(
           onNavigateBack: () {
-            // Navigate back to Home page after confirmation
+
             setState(() {
               selectedIndex = 0;
             });
@@ -207,14 +207,14 @@ class FavoritesPage extends StatefulWidget {
 }
 
 class _FavoritesPageState extends State<FavoritesPage> {
-  // Set to track selected items for batch deletion
+
   final Set<WordPair> _selectedItems = {};
 
-  // Show confirmation dialog for single item
+
   Future<bool> _showSingleItemDeleteConfirmationDialog(WordPair pair) async {
     bool? result = await showDialog<bool>(
       context: context,
-      barrierDismissible: false, // Prevent dismissal by tapping outside
+      barrierDismissible: false, 
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('Confirm Removal'),
@@ -222,13 +222,13 @@ class _FavoritesPageState extends State<FavoritesPage> {
           actions: <Widget>[
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(false); // Return false for "No"
+                Navigator.of(context).pop(false);
               },
               child: Text('No'),
             ),
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(true); // Return true for "Yes"
+                Navigator.of(context).pop(true);
               },
               child: Text('Yes'),
             ),
@@ -268,11 +268,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
       },
     );
     
-    // Default to false if the dialog was somehow dismissed without a selection
+
     return result ?? false;
   }
 
-  // Method to handle deletion of selected items
+
   void _deleteSelectedItems() async {
     if (_selectedItems.isEmpty) {
       // Show snackbar if no items are selected
@@ -305,16 +305,16 @@ class _FavoritesPageState extends State<FavoritesPage> {
     }
   }
 
-  // Method to handle single item tap deletion
+
   void _handleItemTap(WordPair pair) async {
-    // Show confirmation dialog
+
     bool confirmed = await _showSingleItemDeleteConfirmationDialog(pair);
     
     if (confirmed) {
-      // Remove from favorites
+
       Provider.of<MyAppState>(context, listen: false).removeFavorite(pair);
       
-      // Navigate back to Generator page
+
       if (widget.onNavigateBack != null) {
         widget.onNavigateBack!();
       }
@@ -365,7 +365,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                   });
                 },
               ),
-              // Tapping the item triggers the single-item deletion dialog
+
               onTap: () => _handleItemTap(pair),
             ),
         ],
