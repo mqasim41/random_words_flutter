@@ -28,13 +28,12 @@ class MyApp extends StatelessWidget {
 class MyAppState extends ChangeNotifier {
   var current = WordPair.random();
   var favorites = <WordPair>[];
-  var selectedFavorites = <WordPair>{}; // New: For tracking selected items in favorites
 
   void getNext() {
     current = WordPair.random();
     notifyListeners();
   }
-
+  
   void toggleFavorite() {
     if (favorites.contains(current)) {
       favorites.remove(current);
@@ -43,34 +42,16 @@ class MyAppState extends ChangeNotifier {
     }
     notifyListeners();
   }
-
-  // New: Remove a specific word pair from favorites
+  
+  // Add a method to remove a specific favorite item
   void removeFavorite(WordPair pair) {
     favorites.remove(pair);
-    selectedFavorites.remove(pair); // Also remove from selected list if present
     notifyListeners();
   }
-
-  // New: Toggle selection state for a word pair
-  void toggleSelection(WordPair pair) {
-    if (selectedFavorites.contains(pair)) {
-      selectedFavorites.remove(pair);
-    } else {
-      selectedFavorites.add(pair);
-    }
-    notifyListeners();
-  }
-
-  // New: Remove multiple selected favorites
-  void removeSelectedFavorites() {
-    favorites.removeWhere((pair) => selectedFavorites.contains(pair));
-    selectedFavorites.clear();
-    notifyListeners();
-  }
-
-  // New: Clear all selections
-  void clearSelections() {
-    selectedFavorites.clear();
+  
+  // Add a method to remove multiple favorites at once
+  void removeMultipleFavorites(List<WordPair> pairs) {
+    favorites.removeWhere((pair) => pairs.contains(pair));
     notifyListeners();
   }
 }
@@ -81,8 +62,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  var selectedIndex = 0;
-
+  var selectedIndex = 0; 
+  
   @override
   Widget build(BuildContext context) {
     Widget page;
@@ -91,7 +72,14 @@ class _MyHomePageState extends State<MyHomePage> {
         page = GeneratorPage();
         break;
       case 1:
-        page = FavoritesPage();
+        page = FavoritesPage(
+          onNavigateBack: () {
+            // Navigate back to Home page after confirmation
+            setState(() {
+              selectedIndex = 0;
+            });
+          },
+        );
         break;
       default:
         throw UnimplementedError('no widget for $selectedIndex');
@@ -206,76 +194,131 @@ class BigCard extends StatelessWidget {
   }
 }
 
-class FavoritesPage extends StatelessWidget {
-  // Lab Task 1: Show confirmation dialog for deletion
-  void _showDeleteConfirmationDialog(BuildContext context, WordPair pair) {
-    showDialog(
+class FavoritesPage extends StatefulWidget {
+  final Function()? onNavigateBack;
+
+  const FavoritesPage({
+    Key? key,
+    this.onNavigateBack,
+  }) : super(key: key);
+
+  @override
+  State<FavoritesPage> createState() => _FavoritesPageState();
+}
+
+class _FavoritesPageState extends State<FavoritesPage> {
+  // Set to track selected items for batch deletion
+  final Set<WordPair> _selectedItems = {};
+
+  // Show confirmation dialog for single item
+  Future<bool> _showSingleItemDeleteConfirmationDialog(WordPair pair) async {
+    bool? result = await showDialog<bool>(
       context: context,
       barrierDismissible: false, // Prevent dismissal by tapping outside
-      builder: (BuildContext dialogContext) {
+      builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Delete Suggestion'),
-          content: Text('Are you sure you want to delete "${pair.asLowerCase}"?'),
+          title: Text('Confirm Removal'),
+          content: Text('Are you sure you want to remove "${pair.asLowerCase}" from favorites?'),
           actions: <Widget>[
             TextButton(
-              child: Text('No'),
               onPressed: () {
-                Navigator.of(dialogContext).pop(); // Dismiss dialog
+                Navigator.of(context).pop(false); // Return false for "No"
               },
+              child: Text('No'),
             ),
             TextButton(
-              child: Text('Yes'),
               onPressed: () {
-                // Get the app state and remove the pair
-                final appState = Provider.of<MyAppState>(context, listen: false);
-                appState.removeFavorite(pair);
-                Navigator.of(dialogContext).pop(); // Dismiss dialog
+                Navigator.of(context).pop(true); // Return true for "Yes"
               },
+              child: Text('Yes'),
             ),
           ],
         );
       },
     );
+    
+    // Default to false if the dialog was somehow dismissed without a selection
+    return result ?? false;
   }
 
-  // Lab Task 2: Show confirmation dialog for multiple deletion
-  void _showMultiDeleteConfirmationDialog(BuildContext context) {
-    final appState = Provider.of<MyAppState>(context, listen: false);
+  // Show confirmation dialog for deleting multiple items
+  Future<bool> _showMultiDeleteConfirmationDialog(List<WordPair> items) async {
+    bool? result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // Prevent dismissal by tapping outside
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Confirm Deletion'),
+          content: Text('Are you sure you want to delete ${items.length} selected item(s)?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false); // Return false for "No"
+              },
+              child: Text('No'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(true); // Return true for "Yes"
+              },
+              child: Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
     
-    if (appState.selectedFavorites.isEmpty) {
-      // Show SnackBar if no items are selected
+    // Default to false if the dialog was somehow dismissed without a selection
+    return result ?? false;
+  }
+
+  // Method to handle deletion of selected items
+  void _deleteSelectedItems() async {
+    if (_selectedItems.isEmpty) {
+      // Show snackbar if no items are selected
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No Item Selected')),
+        SnackBar(
+          content: Text('No Item Selected'),
+          duration: Duration(seconds: 2),
+        ),
       );
       return;
     }
 
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissal by tapping outside
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: Text('Delete Selected Suggestions'),
-          content: Text('Are you sure you want to delete the selected suggestions?'),
-          actions: <Widget>[
-            TextButton(
-              child: Text('No'),
-              onPressed: () {
-                Navigator.of(dialogContext).pop(); // Dismiss dialog
-              },
-            ),
-            TextButton(
-              child: Text('Yes'),
-              onPressed: () {
-                // Remove selected favorites
-                appState.removeSelectedFavorites();
-                Navigator.of(dialogContext).pop(); // Dismiss dialog
-              },
-            ),
-          ],
-        );
-      },
-    );
+    // Show confirmation dialog
+    bool confirmed = await _showMultiDeleteConfirmationDialog(_selectedItems.toList());
+    
+    if (confirmed) {
+      // Remove selected items from favorites
+      Provider.of<MyAppState>(context, listen: false)
+          .removeMultipleFavorites(_selectedItems.toList());
+      
+      // Clear selection
+      setState(() {
+        _selectedItems.clear();
+      });
+      
+      // Navigate back
+      if (widget.onNavigateBack != null) {
+        widget.onNavigateBack!();
+      }
+    }
+  }
+
+  // Method to handle single item tap deletion
+  void _handleItemTap(WordPair pair) async {
+    // Show confirmation dialog
+    bool confirmed = await _showSingleItemDeleteConfirmationDialog(pair);
+    
+    if (confirmed) {
+      // Remove from favorites
+      Provider.of<MyAppState>(context, listen: false).removeFavorite(pair);
+      
+      // Navigate back to Generator page
+      if (widget.onNavigateBack != null) {
+        widget.onNavigateBack!();
+      }
+    }
   }
 
   @override
@@ -288,16 +331,14 @@ class FavoritesPage extends StatelessWidget {
       );
     }
 
-    // For Lab Task 2: Add AppBar with Delete button
     return Scaffold(
       appBar: AppBar(
         title: Text('Saved Suggestions'),
         actions: [
           IconButton(
             icon: Icon(Icons.delete),
-            onPressed: () {
-              _showMultiDeleteConfirmationDialog(context);
-            },
+            onPressed: _deleteSelectedItems,
+            tooltip: 'Delete selected',
           ),
         ],
       ),
@@ -311,18 +352,21 @@ class FavoritesPage extends StatelessWidget {
             ListTile(
               leading: Icon(Icons.favorite),
               title: Text(pair.asLowerCase),
-              // Lab Task 2: Show checkmark for selected items
-              trailing: appState.selectedFavorites.contains(pair)
-                  ? Icon(Icons.check, color: Colors.green)
-                  : null,
-              onTap: () {
-                // Lab Task 2: Toggle selection when tapped
-                appState.toggleSelection(pair);
-              },
-              // Lab Task 1: Show confirmation dialog on long press
-              onLongPress: () {
-                _showDeleteConfirmationDialog(context, pair);
-              },
+              // Add checkbox for selection instead of checkmark icon
+              trailing: Checkbox(
+                value: _selectedItems.contains(pair),
+                onChanged: (bool? value) {
+                  setState(() {
+                    if (value == true) {
+                      _selectedItems.add(pair);
+                    } else {
+                      _selectedItems.remove(pair);
+                    }
+                  });
+                },
+              ),
+              // Tapping the item triggers the single-item deletion dialog
+              onTap: () => _handleItemTap(pair),
             ),
         ],
       ),
